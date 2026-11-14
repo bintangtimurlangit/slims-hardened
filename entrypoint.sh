@@ -20,7 +20,11 @@ echo "PHP configuration file created: /var/www/html/config/env.php"
 
 # Behind a TLS-terminating proxy, SLiMS must be told to build https:// links.
 FORCE_HTTPS_PHP=false
-[ "${FORCE_HTTPS:-0}" = "1" ] && FORCE_HTTPS_PHP=true
+if [ "${FORCE_HTTPS:-0}" = "1" ]; then
+    FORCE_HTTPS_PHP=true
+    # Apache listens on 8080, but visitors reach us on https/443 through the proxy.
+    export SLIMS_SERVER_NAME="https://localhost:443"
+fi
 cat <<EOF >/var/www/html/config/url.php
 <?php
 return [
