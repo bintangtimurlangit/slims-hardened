@@ -30,8 +30,11 @@ $validator = new \SLiMS\Auth\Validator(config('auth.methods.' . config('auth.sec
 // check session
 $unauthorized = !$validator->isUserLoggedIn();
 if ($unauthorized) {
+    // slims-hardened: a plain visit to /admin just goes to the login page. The alert is kept
+    // for AJAX requests inside the admin, where it explains why the user is being sent away.
+    $isAjax = strtolower($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'xmlhttprequest';
     $msg = '<script type="text/javascript">'."\n";
-    $msg .= 'alert(\''.__('You are not authorized to view this section').'\');'."\n";
+    if ($isAjax) $msg .= 'alert(\''.__('You are not authorized to view this section').'\');'."\n";
     $msg .= 'top.location.href = \''.SWB.'index.php?p=login\';'."\n";
     $msg .= '</script>'."\n";
     
