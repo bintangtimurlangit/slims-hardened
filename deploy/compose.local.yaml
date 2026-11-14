@@ -1,0 +1,11 @@
+# Local testing only: publish the app on localhost (internal networks can't publish ports).
+services:
+  app:
+    image: slims-hardened:dev
+    environment:
+      FORCE_HTTPS: "0"
+    networks: [edge, internal, local]
+    ports:
+      - "127.0.0.1:${HTTP_PORT:-8090}:8080"
+networks:
+  local: {}

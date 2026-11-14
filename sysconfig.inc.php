@@ -65,7 +65,8 @@ $plugins = Plugins::getInstance();
 // use httpOnly for cookie
 @ini_set( 'session.cookie_httponly', true );
 @ini_set( 'session.use_only_cookies', true );
-@ini_set( 'session.cookie_secure', false );
+// slims-hardened: secure-only session cookie whenever the visitor is on HTTPS (proxy sets HTTPS=on)
+@ini_set( 'session.cookie_secure', ($_SERVER['HTTPS'] ?? '') === 'on' );
 
 // check if safe mode is on
 if ((bool) ini_get('safe_mode')) {

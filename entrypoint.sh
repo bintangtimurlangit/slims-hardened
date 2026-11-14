@@ -17,7 +17,17 @@ if (\$based_on_ip) {
 EOF
 
 echo "PHP configuration file created: /var/www/html/config/env.php"
-cat /var/www/html/config/env.php
+
+# Behind a TLS-terminating proxy, SLiMS must be told to build https:// links.
+FORCE_HTTPS_PHP=false
+[ "${FORCE_HTTPS:-0}" = "1" ] && FORCE_HTTPS_PHP=true
+cat <<EOF >/var/www/html/config/url.php
+<?php
+return [
+    'base' => '',
+    'force_https' => ${FORCE_HTTPS_PHP}
+];
+EOF
 
 # Write environment variables to database.php
 cat <<EOF >/var/www/html/config/database.php
@@ -40,8 +50,9 @@ return [
 ];
 EOF
 
+chmod 600 /var/www/html/config/database.php
+# Not printed: it contains the database password.
 echo "PHP configuration file created: /var/www/html/config/database.php"
-cat /var/www/html/config/database.php
 
 # Wait for database to be ready
 echo "Waiting for database to be ready..."
@@ -57,7 +68,12 @@ echo "Database is ready."
 # Randomize admin password on first startup only
 INIT_FLAG="/var/www/html/files/.admin_initialized"
 if [ ! -f "$INIT_FLAG" ]; then
-    ADMIN_PASS=$(openssl rand -base64 12 | tr -dc 'A-Za-z0-9' | head -c 16)
+    # Use ADMIN_INITIAL_PASSWORD if given, otherwise generate one and print it once.
+    if [ -n "${ADMIN_INITIAL_PASSWORD:-}" ]; then
+        ADMIN_PASS="$ADMIN_INITIAL_PASSWORD"; SHOW_PASS=0
+    else
+        ADMIN_PASS=$(openssl rand -base64 12 | tr -dc 'A-Za-z0-9' | head -c 16); SHOW_PASS=1
+    fi
     export ADMIN_PASS
     ADMIN_HASH=$(php -r "echo password_hash(getenv('ADMIN_PASS'), PASSWORD_BCRYPT);")
     export ADMIN_HASH
@@ -89,7 +105,7 @@ if (\$stmt->affected_rows > 0) {
     echo "========================================================"
     echo "  SLIMS FIRST-TIME SETUP - ADMIN CREDENTIALS"
     echo "  Username : admin"
-    echo "  Password : ${ADMIN_PASS}"
+    if [ "$SHOW_PASS" = 1 ]; then echo "  Password : ${ADMIN_PASS}"; else echo "  Password : (set from ADMIN_INITIAL_PASSWORD)"; fi
     echo "  Please change your password immediately after login!"
     echo "========================================================"
     echo ""

@@ -1,0 +1,65 @@
+# One SLiMS library. Copy this folder per library and set .env (see .env.example).
+# The app is only reachable by the reverse proxy over the "${LIBRARY}-edge" network;
+# the database sits on an internal network with no route to the outside.
+
+name: ${LIBRARY}-slims
+
+services:
+  app:
+    image: ghcr.io/bintangtimurlangit/slims-hardened:${SLIMS_TAG:-9.8.0}
+    restart: unless-stopped
+    environment:
+      ENV: production
+      FORCE_HTTPS: "1"
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_USER: slims
+      DB_PASS: ${DB_PASS:?set DB_PASS in .env}
+      DB_NAME: ${DB_NAME:-slims}
+      ADMIN_INITIAL_PASSWORD: ${ADMIN_INITIAL_PASSWORD:-}
+    volumes:
+      - appfiles:/var/www/html/files
+      - appimages:/var/www/html/images
+      - apprepo:/var/www/html/repository
+    networks: [edge, internal]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    mem_limit: 384m
+    pids_limit: 256
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: mariadb:11.8
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASS:?set DB_ROOT_PASS in .env}
+      MARIADB_DATABASE: ${DB_NAME:-slims}
+      MARIADB_USER: slims
+      MARIADB_PASSWORD: ${DB_PASS}
+      MARIADB_AUTO_UPGRADE: "1"
+    volumes:
+      - dbdata:/var/lib/mysql
+      - ./db-init:/docker-entrypoint-initdb.d:ro
+    networks: [internal]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      retries: 30
+
+networks:
+  # Shared only with the reverse proxy. internal: no internet access from the app either.
+  edge:
+    name: ${LIBRARY}-edge
+    internal: true
+  internal:
+    internal: true
+
+volumes:
+  dbdata:
+  appfiles:
+  appimages:
+  apprepo:
