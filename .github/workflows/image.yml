@@ -46,3 +46,27 @@ jobs:
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.description=SLiMS ${{ steps.v.outputs.slims }}, hardened
+
+  # Restarts both libraries' SLiMS on the new image. The key is pinned on the server
+  # to `/usr/local/sbin/deploy slims` (see marjinkiri/infra); the token is used for one pull.
+  deploy:
+    needs: build
+    if: github.repository == 'marjinkiri/slims-hardened'
+    runs-on: ubuntu-24.04
+    permissions:
+      packages: read
+    concurrency:
+      group: deploy-slims
+      cancel-in-progress: false
+    steps:
+      - name: Pull and restart on the VPS
+        env:
+          KEY: ${{ secrets.VPS_DEPLOY_KEY }}
+          KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+          HOST: ${{ secrets.VPS_HOST }}
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          printf '%s\n' "$KEY" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
+          printf '%s\n' "$TOKEN" | ssh -i ~/.ssh/deploy -o BatchMode=yes root@"$HOST"
